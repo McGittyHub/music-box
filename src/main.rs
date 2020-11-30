@@ -2,26 +2,48 @@ extern crate anyhow;
 extern crate cpal;
 extern crate midir;
 
-use std::{thread, time::Instant};
+use std::{
+    sync::{Arc, Mutex},
+    thread,
+    time::Instant,
+};
 
 use std::sync::mpsc;
 
 use audio::setup_audio;
 use imgui::*;
-use midi::setup_midi;
-use wmidi::Note;
+use midi::{setup_midi, MidiEvent};
+use synth::Synth;
+use wmidi::{MidiMessage, Note};
 
 mod audio;
 mod midi;
 mod support;
+mod synth;
 
 fn main() {
     let mut conns = setup_midi().unwrap();
 
-    let (tx, rx) = mpsc::channel();
+    let (tx, rx) = mpsc::channel::<MidiEvent>();
 
-    thread::spawn(|| {
-        setup_audio(rx);
+    thread::spawn(move || {
+        let synth = Arc::new(Mutex::new(Synth::new(48_000.0)));
+        setup_audio(&synth);
+
+        loop {
+            if let Ok(e) = rx.try_recv() {
+                match e.input {
+                    MidiMessage::NoteOff(_, n, _) => {
+                        synth.lock().unwrap().toggle_key_up(n);
+                    }
+                    MidiMessage::NoteOn(_, n, v) => {
+                        let vel = u8::from(v) as f32 / 127.0;
+                        synth.lock().unwrap().toggle_key_down(n, vel);
+                    }
+                    _ => {}
+                }
+            }
+        }
     });
 
     let system = support::init(file!());
