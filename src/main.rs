@@ -26,19 +26,22 @@ fn main() {
 
     let (tx, rx) = mpsc::channel::<MidiEvent>();
 
+    let synth = Arc::new(Mutex::new(Synth::new(48_000.0)));
+
+    let audio_synth = synth.clone();
+
     thread::spawn(move || {
-        let synth = Arc::new(Mutex::new(Synth::new(48_000.0)));
-        setup_audio(&synth);
+        setup_audio(&audio_synth);
 
         loop {
             if let Ok(e) = rx.try_recv() {
                 match e.input {
                     MidiMessage::NoteOff(_, n, _) => {
-                        synth.lock().unwrap().toggle_key_up(n);
+                        audio_synth.lock().unwrap().toggle_key_up(n);
                     }
                     MidiMessage::NoteOn(_, n, v) => {
                         let vel = u8::from(v) as f32 / 127.0;
-                        synth.lock().unwrap().toggle_key_down(n, vel);
+                        audio_synth.lock().unwrap().toggle_key_down(n, vel);
                     }
                     _ => {}
                 }
@@ -54,6 +57,11 @@ fn main() {
 
     let mut last_tick = Instant::now();
 
+    let mut frequencies = vec![0.0; 1000];
+    let mut frequency_index = 0;
+
+    let ui_synth = synth.clone();
+
     system.main_loop(move |_, ui| {
         current_time += Instant::now().duration_since(last_tick).as_micros() as u64;
         last_tick = Instant::now();
@@ -67,14 +75,17 @@ fn main() {
             }
         }
 
-        let midi_win_width = 1000.0;
-        let midi_win_height = 800.0;
+        frequency_index = frequency_index % frequencies.len();
+        frequencies[frequency_index] = ui_synth.lock().unwrap().last_sample();
+        frequency_index += 1;
 
-        Window::new(im_str!("main"))
+        let midi_win_width = 1000.0;
+        let midi_win_height = 400.0;
+
+        Window::new(im_str!("midi"))
             .position([0.0, 0.0], Condition::Always)
             .size([midi_win_width, midi_win_height], Condition::Always)
             .no_decoration()
-            // .always_auto_resize(true)
             .build(ui, || {
                 let draw_list = ui.get_window_draw_list();
 
@@ -87,7 +98,6 @@ fn main() {
                             [midi_win_width, (i + 1) as f32 * s_y],
                             [0.0, 0.0, 0.0],
                         )
-                        // .thickness(10.0)
                         .build();
                 }
 
@@ -141,21 +151,29 @@ fn main() {
                 }
             });
 
-        // for (i, con) in conns.iter().enumerate() {
-        //     Window::new(&im_str!("{}", i))
-        //         .size([300.0, 110.0], Condition::FirstUseEver)
-        //         .build(ui, || {
-        //             let event_names = con
-        //                 .input
-        //                 .iter()
-        //                 .map(|e| im_str!("{} {:?}", e.time, e.input))
-        //                 .collect::<Vec<_>>();
+        Window::new(im_str!("oscilloscope"))
+            .position([0.0, midi_win_height], Condition::Always)
+            .size([midi_win_width, midi_win_height], Condition::Always)
+            .no_decoration()
+            .build(ui, || {
+                let draw_list = ui.get_window_draw_list();
 
-        //             let hack = event_names.iter().collect::<Vec<_>>();
-
-        //             let mut idx = 0;
-        //             ui.list_box(im_str!("input"), &mut idx, &hack, 32);
-        //         });
-        // }
+                for (i, f) in frequencies.windows(2).enumerate() {
+                    draw_list
+                        .add_line(
+                            [
+                                i as f32 * midi_win_width / frequencies.len() as f32,
+                                midi_win_height + (f[0] + 1.0) * midi_win_height / 2.0,
+                            ],
+                            [
+                                (i + 1) as f32 * midi_win_width / frequencies.len() as f32,
+                                midi_win_height + (f[1] + 1.0) * midi_win_height / 2.0,
+                            ],
+                            [1.0, 1.0, 1.0],
+                        )
+                        // .thickness(10.0)
+                        .build();
+                }
+            });
     });
 }

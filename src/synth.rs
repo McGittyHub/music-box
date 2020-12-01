@@ -14,6 +14,7 @@ pub struct Synth {
     pub sample_rate: f32,
     time: f32,
     keys_pressed: Vec<Voice>,
+    last_sample: f32,
 }
 
 struct ADSR {
@@ -57,7 +58,12 @@ impl Synth {
             sample_rate,
             time: 0.0,
             keys_pressed: vec![],
+            last_sample: 0.0,
         }
+    }
+
+    pub fn last_sample(&self) -> f32 {
+        self.last_sample
     }
 
     pub fn next_sample(&mut self) -> f32 {
@@ -99,6 +105,8 @@ impl Synth {
                 true
             }
         });
+
+        self.last_sample = sample;
 
         sample
     }
