@@ -1,6 +1,7 @@
 extern crate anyhow;
 extern crate cpal;
 extern crate midir;
+extern crate rustfft;
 
 use std::{
     sync::{Arc, Mutex},
@@ -13,6 +14,7 @@ use std::sync::mpsc;
 use audio::setup_audio;
 use imgui::*;
 use midi::{setup_midi, MidiEvent};
+use rustfft::{num_complex::Complex, FFT};
 use synth::Synth;
 use wmidi::{MidiMessage, Note};
 
@@ -58,12 +60,16 @@ fn main() {
 
     let mut last_tick = Instant::now();
 
-    let mut frequencies = vec![0.0; 1000];
+    let mut frequencies = vec![0.0; 4096*16];
     let mut frequency_index = 0;
 
     let ui_synth = synth.clone();
 
     let mut last_samples = 0;
+
+    let fft = rustfft::algorithm::Radix4::<f32>::new(frequencies.len(), false);
+
+    let mut averages = vec![0.0; frequencies.len() / 2];
 
     system.main_loop(move |_, ui| {
         current_time += Instant::now().duration_since(last_tick).as_micros() as u64;
@@ -82,7 +88,7 @@ fn main() {
             let buffer = synth.sample_buffer();
             let samples = synth.samples();
 
-            for s in 0..samples-last_samples {
+            for s in 0..samples - last_samples {
                 frequency_index = frequency_index % frequencies.len();
                 frequencies[frequency_index] = buffer.get(s as usize).cloned().unwrap_or_default(); // TODO: Is this a good idea?
                 frequency_index += 1;
@@ -91,7 +97,23 @@ fn main() {
             last_samples = samples;
         }
 
-        let midi_win_width = 1000.0;
+        let mut freqs = frequencies
+            .iter()
+            .map(|&f| Complex::new(f, 0.0))
+            .collect::<Vec<_>>();
+
+        let mut out = vec![Complex::new(0.0, 0.0); freqs.len()];
+
+        fft.process(&mut freqs, &mut out);
+
+        out.truncate(freqs.len() / 2);
+
+        for i in 0..averages.len() {
+            averages[i] += out[i].re;
+            averages[i] /= 8.0;
+        }
+
+        let midi_win_width = 800.0;
         let midi_win_height = 400.0;
 
         Window::new(im_str!("midi"))
@@ -180,6 +202,44 @@ fn main() {
                             [
                                 (i + 1) as f32 * midi_win_width / frequencies.len() as f32,
                                 midi_win_height + (f[1] + 1.0) * midi_win_height / 2.0,
+                            ],
+                            [1.0, 1.0, 1.0],
+                        )
+                        .build();
+                }
+            });
+
+        Window::new(im_str!("spectrum"))
+            .position([midi_win_width, midi_win_height], Condition::Always)
+            .size([midi_win_width, midi_win_height], Condition::Always)
+            .no_decoration()
+            .build(ui, || {
+                let draw_list = ui.get_window_draw_list();
+
+                let log_coef =
+                    1.0 / (out.len() as f32 + 1.0).log(std::f32::consts::E) * out.len() as f32;
+
+                for (i, _) in out.windows(2).enumerate() {
+                    let x = i as f32;
+
+                    let f0 = out.len() as f32
+                        - (log_coef * (out.len() as f32 + 1.0 - i as f32).log(std::f32::consts::E));
+                    let f0 = averages[f0 as usize] * (1.0 / (out.len() as f32).sqrt());
+
+                    let f1 = out.len() as f32
+                        - (log_coef
+                            * (out.len() as f32 + 1.0 - (i + 1) as f32).log(std::f32::consts::E));
+                    let f1 = averages[f1 as usize] * (1.0 / (out.len() as f32).sqrt());
+
+                    draw_list
+                        .add_line(
+                            [
+                                midi_win_width + x * midi_win_width / out.len() as f32,
+                                2.0 * midi_win_height - f0 * midi_win_height,
+                            ],
+                            [
+                                midi_win_width + (x + 1.0) * midi_win_width / out.len() as f32,
+                                2.0 * midi_win_height - f1 * midi_win_height,
                             ],
                             [1.0, 1.0, 1.0],
                         )
