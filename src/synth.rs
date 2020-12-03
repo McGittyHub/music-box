@@ -2,6 +2,8 @@ use std::f32::consts::PI;
 
 use wmidi::Note;
 
+use crate::ringbuffer::RingBuffer;
+
 struct Voice {
     key: Note,
     velocity: f32,
@@ -14,7 +16,7 @@ pub struct Synth {
     pub sample_rate: f32,
     time: f32,
     keys_pressed: Vec<Voice>,
-    last_sample: f32,
+    sample_buffer: RingBuffer<f32>,
 }
 
 struct ADSR {
@@ -58,12 +60,12 @@ impl Synth {
             sample_rate,
             time: 0.0,
             keys_pressed: vec![],
-            last_sample: 0.0,
+            sample_buffer: RingBuffer::with_size(4096),
         }
     }
 
-    pub fn last_sample(&self) -> f32 {
-        self.last_sample
+    pub fn sample_buffer(&self) -> &RingBuffer<f32> {
+        &self.sample_buffer
     }
 
     pub fn next_sample(&mut self) -> f32 {
@@ -106,7 +108,7 @@ impl Synth {
             }
         });
 
-        self.last_sample = sample;
+        self.sample_buffer.push(sample);
 
         sample
     }

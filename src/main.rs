@@ -18,6 +18,7 @@ use wmidi::{MidiMessage, Note};
 
 mod audio;
 mod midi;
+mod ringbuffer;
 mod support;
 mod synth;
 
@@ -75,9 +76,19 @@ fn main() {
             }
         }
 
-        frequency_index = frequency_index % frequencies.len();
-        frequencies[frequency_index] = ui_synth.lock().unwrap().last_sample();
-        frequency_index += 1;
+        let dt = ui.io().delta_time;
+
+        let samples_elapsed = (dt / (1.0 / 48_000.0)) as usize;
+
+        if let Ok(synth) = ui_synth.lock() {
+            let buffer = synth.sample_buffer();
+
+            for s in 0..samples_elapsed {
+                frequency_index = frequency_index % frequencies.len();
+                frequencies[frequency_index] = buffer.get(s).cloned().unwrap_or_default(); // TODO: Is this a good idea?
+                frequency_index += 1;
+            }
+        }
 
         let midi_win_width = 1000.0;
         let midi_win_height = 400.0;
@@ -171,7 +182,6 @@ fn main() {
                             ],
                             [1.0, 1.0, 1.0],
                         )
-                        // .thickness(10.0)
                         .build();
                 }
             });
