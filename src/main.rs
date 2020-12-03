@@ -109,8 +109,9 @@ fn main() {
         out.truncate(freqs.len() / 2);
 
         for i in 0..averages.len() {
-            averages[i] += out[i].re;
-            averages[i] /= 8.0;
+            averages[i] = out[i].re;
+            // averages[i] += out[i].re;
+            // averages[i] /= 4.0;
         }
 
         let midi_win_width = 800.0;
@@ -216,15 +217,23 @@ fn main() {
             .build(ui, || {
                 let draw_list = ui.get_window_draw_list();
 
-                let log_coef =
-                    1.0 / (out.len() as f32 + 1.0).log(std::f32::consts::E) * out.len() as f32;
+                // let mut smoothed = vec![0.0; midi_win_width as usize];
+                let mut smoothed = vec![0.0; averages.len() / 8];
+                let downsampled = averages.len() / smoothed.len();
+                for i in 0..smoothed.len() {
+                    let slice = &averages[i.saturating_sub(downsampled / 2)
+                        ..(i + downsampled / 2).min(smoothed.len())];
+                    smoothed[i] = slice.iter().sum::<f32>() / (downsampled as f32 * 2.0);
+                }
 
-                let displayed = (0..averages.len())
+                let len = smoothed.len() as f32;
+
+                let log_coef = 1.0 / (len + 1.0).log(std::f32::consts::E) * len;
+
+                let displayed = (0..smoothed.len())
                     .map(|i| {
-                        let f = out.len() as f32
-                            - (log_coef
-                                * (out.len() as f32 + 1.0 - i as f32).log(std::f32::consts::E));
-                        averages[f as usize] * (1.0 / (out.len() as f32).sqrt())
+                        let f = len - (log_coef * (len + 1.0 - i as f32).log(std::f32::consts::E));
+                        smoothed[f as usize] * (1.0 / len.sqrt())
                     })
                     .collect::<Vec<_>>();
 
@@ -240,11 +249,11 @@ fn main() {
                     draw_list
                         .add_line(
                             [
-                                midi_win_width + x * midi_win_width / out.len() as f32,
+                                midi_win_width + x * midi_win_width / len,
                                 2.0 * midi_win_height - f[0] / max * midi_win_height,
                             ],
                             [
-                                midi_win_width + (x + 1.0) * midi_win_width / out.len() as f32,
+                                midi_win_width + (x + 1.0) * midi_win_width / len,
                                 2.0 * midi_win_height - f[1] / max * midi_win_height,
                             ],
                             [1.0, 1.0, 1.0],

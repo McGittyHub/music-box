@@ -75,7 +75,8 @@ impl Synth {
     }
 
     pub fn next_sample(&mut self) -> f32 {
-        self.sample_clock = (self.sample_clock + 1.0) % self.sample_rate;
+        // self.sample_clock = (self.sample_clock + 1.0) % self.sample_rate; // this produces clicks every second
+        self.sample_clock += 1.0; // TODO: Fix, will go bad eventually
 
         self.time += 1.0 / self.sample_rate;
 
