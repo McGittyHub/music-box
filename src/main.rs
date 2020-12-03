@@ -60,7 +60,7 @@ fn main() {
 
     let mut last_tick = Instant::now();
 
-    let mut frequencies = vec![0.0; 4096*16];
+    let mut frequencies = vec![0.0; 4096 * 16];
     let mut frequency_index = 0;
 
     let ui_synth = synth.clone();
@@ -219,27 +219,33 @@ fn main() {
                 let log_coef =
                     1.0 / (out.len() as f32 + 1.0).log(std::f32::consts::E) * out.len() as f32;
 
-                for (i, _) in out.windows(2).enumerate() {
+                let displayed = (0..averages.len())
+                    .map(|i| {
+                        let f = out.len() as f32
+                            - (log_coef
+                                * (out.len() as f32 + 1.0 - i as f32).log(std::f32::consts::E));
+                        averages[f as usize] * (1.0 / (out.len() as f32).sqrt())
+                    })
+                    .collect::<Vec<_>>();
+
+                let max = displayed
+                    .iter()
+                    .cloned()
+                    .max_by_key(|f| (f * 1000.0) as i32)
+                    .unwrap();
+
+                for (i, f) in displayed.windows(2).enumerate() {
                     let x = i as f32;
-
-                    let f0 = out.len() as f32
-                        - (log_coef * (out.len() as f32 + 1.0 - i as f32).log(std::f32::consts::E));
-                    let f0 = averages[f0 as usize] * (1.0 / (out.len() as f32).sqrt());
-
-                    let f1 = out.len() as f32
-                        - (log_coef
-                            * (out.len() as f32 + 1.0 - (i + 1) as f32).log(std::f32::consts::E));
-                    let f1 = averages[f1 as usize] * (1.0 / (out.len() as f32).sqrt());
 
                     draw_list
                         .add_line(
                             [
                                 midi_win_width + x * midi_win_width / out.len() as f32,
-                                2.0 * midi_win_height - f0 * midi_win_height,
+                                2.0 * midi_win_height - f[0] / max * midi_win_height,
                             ],
                             [
                                 midi_win_width + (x + 1.0) * midi_win_width / out.len() as f32,
-                                2.0 * midi_win_height - f1 * midi_win_height,
+                                2.0 * midi_win_height - f[1] / max * midi_win_height,
                             ],
                             [1.0, 1.0, 1.0],
                         )
