@@ -17,6 +17,7 @@ pub struct Synth {
     time: f32,
     keys_pressed: Vec<Voice>,
     sample_buffer: RingBuffer<f32>,
+    samples: u64,
 }
 
 struct ADSR {
@@ -61,11 +62,16 @@ impl Synth {
             time: 0.0,
             keys_pressed: vec![],
             sample_buffer: RingBuffer::with_size(4096),
+            samples: 0,
         }
     }
 
     pub fn sample_buffer(&self) -> &RingBuffer<f32> {
         &self.sample_buffer
+    }
+
+    pub fn samples(&self) -> u64 {
+        self.samples
     }
 
     pub fn next_sample(&mut self) -> f32 {
@@ -109,6 +115,7 @@ impl Synth {
         });
 
         self.sample_buffer.push(sample);
+        self.samples += 1;
 
         sample
     }

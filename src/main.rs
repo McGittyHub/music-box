@@ -63,6 +63,8 @@ fn main() {
 
     let ui_synth = synth.clone();
 
+    let mut last_samples = 0;
+
     system.main_loop(move |_, ui| {
         current_time += Instant::now().duration_since(last_tick).as_micros() as u64;
         last_tick = Instant::now();
@@ -76,18 +78,17 @@ fn main() {
             }
         }
 
-        let dt = ui.io().delta_time;
-
-        let samples_elapsed = (dt / (1.0 / 48_000.0)) as usize;
-
         if let Ok(synth) = ui_synth.lock() {
             let buffer = synth.sample_buffer();
+            let samples = synth.samples();
 
-            for s in 0..samples_elapsed {
+            for s in 0..samples-last_samples {
                 frequency_index = frequency_index % frequencies.len();
-                frequencies[frequency_index] = buffer.get(s).cloned().unwrap_or_default(); // TODO: Is this a good idea?
+                frequencies[frequency_index] = buffer.get(s as usize).cloned().unwrap_or_default(); // TODO: Is this a good idea?
                 frequency_index += 1;
             }
+
+            last_samples = samples;
         }
 
         let midi_win_width = 1000.0;
