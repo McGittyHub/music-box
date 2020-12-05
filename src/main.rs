@@ -14,6 +14,7 @@ use std::sync::mpsc;
 use audio::setup_audio;
 use imgui::*;
 use midi::{setup_midi, MidiEvent};
+use rustfft::num_traits::Zero;
 use rustfft::{num_complex::Complex, FFT};
 use synth::Synth;
 use wmidi::{MidiMessage, Note};
@@ -97,21 +98,24 @@ fn main() {
             last_samples = samples;
         }
 
-        let mut freqs = frequencies
-            .iter()
-            .map(|&f| Complex::new(f, 0.0))
+        let mut freqs = (0..frequencies.len())
+            .map(|i| {
+                Complex::new(
+                    frequencies[(frequencies.len() - i + frequency_index) % frequencies.len()],
+                    0.0,
+                )
+            })
             .collect::<Vec<_>>();
 
-        let mut out = vec![Complex::new(0.0, 0.0); freqs.len()];
+        let mut out = vec![Complex::zero(); freqs.len()];
 
         fft.process(&mut freqs, &mut out);
 
         out.truncate(freqs.len() / 2);
 
         for i in 0..averages.len() {
-            averages[i] = out[i].re;
-            // averages[i] += out[i].re;
-            // averages[i] /= 4.0;
+            averages[i] += out[i].re;
+            averages[i] /= 32.0;
         }
 
         let midi_win_width = 800.0;
@@ -193,7 +197,14 @@ fn main() {
             .build(ui, || {
                 let draw_list = ui.get_window_draw_list();
 
-                for (i, f) in frequencies.windows(2).enumerate() {
+                // Sliding oscilloscope
+                // let freqs = (0..frequencies.len())
+                //     .map(|i| {
+                //         frequencies[(frequencies.len() - i + frequency_index) % frequencies.len()]
+                //     })
+                //     .collect::<Vec<_>>();
+
+                for (i, f) in frequencies.windows(2).rev().enumerate() {
                     draw_list
                         .add_line(
                             [
@@ -260,6 +271,14 @@ fn main() {
                         )
                         .build();
                 }
+            });
+
+        Window::new(im_str!("synth"))
+            .position([midi_win_width, 0.0], Condition::Always)
+            .size([midi_win_width, midi_win_height], Condition::Always)
+            .no_decoration()
+            .build(ui, || {
+                let draw_list = ui.get_window_draw_list();
             });
     });
 }
