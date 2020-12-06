@@ -117,7 +117,7 @@ fn main() {
         out.truncate(freqs.len() / 2);
 
         for i in 0..averages.len() {
-            averages[i] += out[i].re;
+            averages[i] += (out[i].re.powi(2) + out[i].im.powi(2)).sqrt();
             averages[i] /= 32.0;
         }
 
