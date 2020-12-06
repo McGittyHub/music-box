@@ -91,7 +91,10 @@ fn main() {
 
             for s in 0..samples - last_samples {
                 frequency_index = frequency_index % frequencies.len();
-                frequencies[frequency_index] = buffer.get(s as usize).cloned().unwrap_or_default(); // TODO: Is this a good idea?
+                frequencies[frequency_index] = buffer
+                    .get((samples - last_samples - s - 1) as usize)
+                    .cloned()
+                    .unwrap(); // TODO: Is this a good idea?
                 frequency_index += 1;
             }
 
@@ -278,7 +281,7 @@ fn main() {
             .size([midi_win_width, midi_win_height], Condition::Always)
             .no_decoration()
             .build(ui, || {
-                let draw_list = ui.get_window_draw_list();
+                // let draw_list = ui.get_window_draw_list();
             });
     });
 }

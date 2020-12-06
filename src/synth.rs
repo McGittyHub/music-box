@@ -32,7 +32,7 @@ fn lin_lerp(a: f32, b: f32, mut t: f32) -> f32 {
         t = 0.0;
     }
     if t > 1.0 {
-        t = 0.0;
+        t = 1.0;
     }
     a * (1.0 - t) + b * t
 }
@@ -61,7 +61,7 @@ impl Synth {
             sample_rate,
             time: 0.0,
             keys_pressed: vec![],
-            sample_buffer: RingBuffer::with_size(4096),
+            sample_buffer: RingBuffer::with_size(4096*4),
             samples: 0,
         }
     }
