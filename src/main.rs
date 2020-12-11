@@ -17,13 +17,16 @@ use midi::{setup_midi, MidiEvent};
 use rustfft::num_traits::Zero;
 use rustfft::{num_complex::Complex, FFT};
 use synth::Synth;
-use wmidi::{MidiMessage, Note};
+use ui::midi_drawer::draw_midi_viewer;
+use wmidi::MidiMessage;
 
 mod audio;
 mod midi;
 mod ringbuffer;
 mod support;
 mod synth;
+
+mod ui;
 
 fn main() {
     let mut conns = setup_midi().unwrap();
@@ -129,68 +132,7 @@ fn main() {
             .size([midi_win_width, midi_win_height], Condition::Always)
             .no_decoration()
             .build(ui, || {
-                let draw_list = ui.get_window_draw_list();
-
-                let s_y = midi_win_height / 128.0;
-
-                for i in 0..128 {
-                    draw_list
-                        .add_line(
-                            [0.0, i as f32 * s_y],
-                            [midi_win_width, (i + 1) as f32 * s_y],
-                            [0.0, 0.0, 0.0],
-                        )
-                        .build();
-                }
-
-                if notes.len() >= 1 {
-                    let start = notes[0].time as f32;
-                    let end = current_time as f32;
-                    let len = end - start as f32;
-
-                    let mut notes_on = vec![];
-
-                    let s_x = midi_win_width / len;
-
-                    for note in &notes {
-                        match note.input {
-                            wmidi::MidiMessage::NoteOff(_, n, _) => {
-                                let start_note = notes_on.swap_remove(
-                                    notes_on
-                                        .iter()
-                                        .position(|i: &(u64, Note)| i.1 == n)
-                                        .unwrap(),
-                                );
-
-                                let t1 = (start_note.0 as f32 - start) * s_x;
-                                let t2 = (note.time as f32 - start) * s_x;
-
-                                let n = u8::from(n) as f32;
-
-                                draw_list
-                                    .add_rect([t1, n * s_y], [t2, (n + 1.0) * s_y], [1.0, 1.0, 1.0])
-                                    .filled(true)
-                                    .build();
-                            }
-                            wmidi::MidiMessage::NoteOn(_, n, _) => {
-                                notes_on.push((note.time, n));
-                            }
-                            _ => {}
-                        }
-                    }
-
-                    for (time, note) in notes_on {
-                        let t1 = (time as f32 - start) * s_x;
-                        let t2 = (current_time as f32 - start) * s_x;
-
-                        let n = u8::from(note) as f32;
-
-                        draw_list
-                            .add_rect([t1, n * s_y], [t2, (n + 1.0) * s_y], [1.0, 1.0, 1.0])
-                            .filled(true)
-                            .build();
-                    }
-                }
+                draw_midi_viewer(ui, &notes, current_time, midi_win_width, midi_win_height);
             });
 
         Window::new(im_str!("oscilloscope"))

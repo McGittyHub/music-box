@@ -61,7 +61,7 @@ impl Synth {
             sample_rate,
             time: 0.0,
             keys_pressed: vec![],
-            sample_buffer: RingBuffer::with_size(4096*4),
+            sample_buffer: RingBuffer::with_size(4096 * 4),
             samples: 0,
         }
     }
