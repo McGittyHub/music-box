@@ -98,7 +98,22 @@ impl Synth {
                 adsr.evaluate(self.time - voice.time, 0.0, true) * voice.velocity
             };
 
-            sample += (self.sample_clock * freq * 2.0 * PI / self.sample_rate).sin() * vol;
+            let partials = 64;
+
+            for partial in 1..partials {
+                if partial % 2 == 0 {
+                    continue;
+                }
+                let partial = partial as f32;
+
+                let x = partial * PI / (partials + 1) as f32;
+                let sigma = x.sin() / x; // Smoothes out wave, not always desirable
+
+                sample += (1.0 / partial)
+                    * sigma
+                    * (partial * self.sample_clock * freq * 2.0 * PI / self.sample_rate).sin()
+                    * vol;
+            }
         }
 
         // Remove fully released voices
