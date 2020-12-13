@@ -223,7 +223,36 @@ fn main() {
             .size([midi_win_width, midi_win_height], Condition::Always)
             .no_decoration()
             .build(ui, || {
-                // let draw_list = ui.get_window_draw_list();
+                let draw_list = ui.get_window_draw_list();
+                for (partial, &partial_volume) in synth.lock().unwrap().partials.iter().enumerate()
+                {
+                    draw_list
+                        .add_rect(
+                            [
+                                midi_win_width + partial as f32 * midi_win_width / 64.0,
+                                (1.0 - partial_volume) * midi_win_height,
+                            ],
+                            [
+                                midi_win_width + (partial + 1) as f32 * midi_win_width / 64.0,
+                                midi_win_height,
+                            ],
+                            [1.0, 1.0, 1.0],
+                        )
+                        .build();
+                }
             });
+
+        let [p_x, p_y] = ui.io().mouse_pos;
+        if ui.is_mouse_down(MouseButton::Left)
+            && p_x > midi_win_width
+            && p_x < midi_win_width * 2.0
+            && p_y > 0.0
+            && p_y < midi_win_height
+        {
+            let partial = (64.0 * (p_x - midi_win_width) / midi_win_width) as usize;
+            let p_vol = 1.0 - p_y / midi_win_height;
+
+            synth.lock().unwrap().partials[partial] = p_vol;
+        }
     });
 }

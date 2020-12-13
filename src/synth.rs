@@ -18,6 +18,7 @@ pub struct Synth {
     keys_pressed: Vec<Voice>,
     sample_buffer: RingBuffer<f32>,
     samples: u64,
+    pub partials: Vec<f32>,
 }
 
 struct ADSR {
@@ -63,6 +64,7 @@ impl Synth {
             keys_pressed: vec![],
             sample_buffer: RingBuffer::with_size(4096 * 4),
             samples: 0,
+            partials: vec![1.0; 64],
         }
     }
 
@@ -98,21 +100,19 @@ impl Synth {
                 adsr.evaluate(self.time - voice.time, 0.0, true) * voice.velocity
             };
 
-            let partials = 64;
+            let partial_count = 64;
 
-            for partial in 1..partials {
-                if partial % 2 == 0 {
-                    continue;
-                }
-                let partial = partial as f32;
+            for (partial, &partial_volume) in self.partials.iter().enumerate() {
+                let partial = (partial + 1) as f32;
 
-                let x = partial * PI / (partials + 1) as f32;
+                let x = partial * PI / (partial_count + 1) as f32;
                 let sigma = x.sin() / x; // Smoothes out wave, not always desirable
 
                 sample += (1.0 / partial)
                     * sigma
                     * (partial * self.sample_clock * freq * 2.0 * PI / self.sample_rate).sin()
-                    * vol;
+                    * vol
+                    * partial_volume;
             }
         }
 
