@@ -37,6 +37,14 @@ pub fn setup_midi() -> Result<Vec<MidiSource>, Box<dyn Error>> {
                 move |stamp, bytes, tx| {
                     let message = wmidi::MidiMessage::try_from(bytes).unwrap().to_owned();
 
+                    match message {
+                        MidiMessage::NoteOff(_, _, _) => {}
+                        MidiMessage::NoteOn(_, _, _) => {}
+                        _ => {
+                            return;
+                        }
+                    }
+
                     tx.send(MidiEvent {
                         input: message,
                         time: stamp,

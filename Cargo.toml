@@ -15,3 +15,6 @@ wmidi = "4.0.1"
 cpal = "0.13.1"
 anyhow = "1.0.12"
 rustfft = "4.0.0"
+
+[profile.release]
+debug = true

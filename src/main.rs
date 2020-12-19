@@ -41,7 +41,7 @@ fn main() {
         setup_audio(&audio_synth);
 
         loop {
-            if let Ok(e) = rx.try_recv() {
+            if let Ok(e) = rx.recv() {
                 match e.input {
                     MidiMessage::NoteOff(_, n, _) => {
                         audio_synth.lock().unwrap().toggle_key_up(n);
@@ -50,7 +50,9 @@ fn main() {
                         let vel = u8::from(v) as f32 / 127.0;
                         audio_synth.lock().unwrap().toggle_key_down(n, vel);
                     }
-                    _ => {}
+                    _ => {
+                        panic!();
+                    }
                 }
             }
         }
